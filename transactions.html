@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>سجل المعاملات - النسخة الاحترافية</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0b0f19; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: #ffffff; overflow-x: hidden; }
+        
+        .transactions-container {
+            background-color: #0d1220; width: 100%; max-width: 410px; height: 100vh; max-height: 850px;
+            display: flex; flex-direction: column; border-radius: 28px; overflow-y: auto;
+            box-shadow: 0 0 40px rgba(100, 50, 255, 0.25); border: 1.5px solid rgba(168, 85, 247, 0.4);
+            padding: 20px; position: relative; -webkit-overflow-scrolling: touch;
+        }
+        .transactions-container::-webkit-scrollbar { width: 4px; }
+        .transactions-container::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 10px; }
+
+        /* أنيميشن دايرة التحديث (Pull-to-Refresh) */
+        .refresh-spinner {
+            position: absolute; top: -50px; left: 50%; transform: translateX(-50%);
+            width: 36px; height: 36px; border: 3px solid rgba(56, 189, 248, 0.2);
+            border-top-color: #38bdf8; border-radius: 50%; transition: top 0.3s ease;
+            display: flex; justify-content: center; align-items: center; z-index: 10;
+        }
+        .refresh-spinner.spinning { animation: spin 0.8s linear infinite; }
+        @keyframes spin { 0% { transform: translateX(-50%) rotate(0deg); } 100% { transform: translateX(-50%) rotate(360deg); } }
+
+        .top-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; }
+        .page-title { font-size: 22px; font-weight: bold; color: #fde047; text-shadow: 0 0 12px rgba(253, 224, 71, 0.4); }
+        .back-btn { background: #131b2e; border: 1px solid rgba(56, 189, 248, 0.5); color: #38bdf8; padding: 7px 16px; border-radius: 12px; font-size: 14px; cursor: pointer; font-weight: bold; }
+        
+        .list-section { display: flex; flex-direction: column; gap: 14px; padding-bottom: 20px; }
+        .transaction-card { background: #111726; border: 1.5px solid rgba(168, 85, 247, 0.3); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+        .trans-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; }
+        .trans-type { font-size: 15px; font-weight: bold; }
+        .type-deposit { color: #38bdf8; }
+        .type-withdraw { color: #c084fc; }
+        .trans-method { background: #1f293d; color: #fde047; padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+        .trans-details { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #cbd5e1; }
+        .trans-row { display: flex; justify-content: space-between; }
+        .trans-row span.val { color: #ffffff; font-weight: bold; }
+        .trans-row span.amount-val { color: #4ade80; font-weight: bold; }
+        
+        .status-badge { padding: 4px 12px; border-radius: 10px; font-size: 12px; font-weight: bold; text-align: center; }
+        .status-pending { background: rgba(250, 204, 21, 0.15); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.3); }
+        .status-approved { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .status-rejected { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .trans-time { font-size: 11px; color: #64748b; text-align: left; margin-top: 2px; }
+        .no-data { text-align: center; color: #64748b; font-size: 15px; margin-top: 80px; }
+    </style>
+</head>
+<body>
+
+    <div class="transactions-container" id="container">
+        <!-- دايرة التحديث اللي بتنزلك من فوق لما تشد الصفحة -->
+        <div class="refresh-spinner" id="spinner">⟳</div>
+
+        <div class="top-header">
+            <div class="page-title">سجل المعاملات</div>
+            <button class="back-btn" onclick="goBack()">رجوع →</button>
+        </div>
+
+        <div class="list-section" id="transactions-list">
+            <div class="no-data">جاري تحميل المعاملات...</div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyBv5Tl96ZNAbtGhLHwhjFYsjlvx3J9pN2g", databaseURL: "https://project-4572c85f-9506-47dd-b9c-default-rtdb.firebaseio.com/" };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const userID = urlParams.get('id') || localStorage.getItem("user_id");
+        const listEl = document.getElementById('transactions-list');
+        const container = document.getElementById('container');
+        const spinner = document.getElementById('spinner');
+
+        let startY = 0;
+
+        // تفعيل سحب الشاشة لتحت (Pull-to-Refresh)
+        container.addEventListener('touchstart', (e) => {
+            if (container.scrollTop === 0) { startY = e.touches[0].clientY; }
+        });
+
+        container.addEventListener('touchmove', (e) => {
+            let currentY = e.touches[0].clientY;
+            if (container.scrollTop === 0 && currentY - startY > 60) {
+                spinner.style.top = "20px";
+            }
+        });
+
+        container.addEventListener('touchend', () => {
+            if (parseInt(spinner.style.top) >= 20) {
+                spinner.classList.add('spinning');
+                setTimeout(() => {
+                    location.reload(); // إعادة تحميل الصفحة لتحديث البيانات
+                }, 1000);
+            } else {
+                spinner.style.top = "-50px";
+            }
+        });
+
+        if (!userID) { window.location.replace("index.html"); }
+        else { loadUserTransactions(); }
+
+        function loadUserTransactions() {
+            let allTransactions = [];
+
+            database.ref('Deposits').orderByChild('userId').equalTo(userID).on('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    snapshot.forEach((child) => {
+                        let item = child.val();
+                        item.category = 'deposit';
+                        allTransactions.push(item);
+                    });
+                }
+                renderTransactions(allTransactions);
+            });
+
+            database.ref('Withdraws').orderByChild('userId').equalTo(userID).on('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    snapshot.forEach((child) => {
+                        let item = child.val();
+                        item.category = 'withdraw';
+                        allTransactions.push(item);
+                    });
+                }
+                renderTransactions(allTransactions);
+            });
+        }
+
+        function renderTransactions(transactions) {
+            listEl.innerHTML = "";
+            if (transactions.length === 0) {
+                listEl.innerHTML = `<div class="no-data">لا توجد معاملات سابقة حتى الآن 📭</div>`;
+                return;
+            }
+
+            transactions.sort((a, b) => b.timestamp - a.timestamp);
+
+            transactions.forEach((tx) => {
+                const dateString = new Date(tx.timestamp).toLocaleString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                let typeTitle = tx.category === 'deposit' ? 'إيداع أموال 📥' : 'طلب سحب 📤';
+                let typeClass = tx.category === 'deposit' ? 'type-deposit' : 'type-withdraw';
+
+                let statusText = "قيد الانتظار";
+                let statusClass = "status-pending";
+
+                if (tx.status === "Approved") { statusText = "مقبول"; statusClass = "status-approved"; }
+                else if (tx.status === "Rejected") { statusText = "مرفوض"; statusClass = "status-rejected"; }
+
+                const card = document.createElement('div');
+                card.className = 'transaction-card';
+                card.innerHTML = `
+                    <div class="trans-header">
+                        <span class="trans-type ${typeClass}">${typeTitle}</span>
+                        <span class="trans-method">${tx.method}</span>
+                    </div>
+                    <div class="trans-details">
+                        <div class="trans-row"><span>رقم الطلب:</span><span class="val">#${tx.orderId}</span></div>
+                        <div class="trans-row"><span>المبلغ:</span><span class="amount-val">${tx.amount} ج.م</span></div>
+                        <div class="trans-row"><span>الحالة:</span><span class="status-badge ${statusClass}">${statusText}</span></div>
+                    </div>
+                    <div class="trans-time">${dateString}</div>
+                `;
+                listEl.appendChild(card);
+            });
+        }
+
+        function goBack() { window.location.href = "dashboard.html?id=" + userID; }
+    </script>
+</body>
+</html>

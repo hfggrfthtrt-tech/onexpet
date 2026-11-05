@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>لعبة الطائرة - Crash دقيق 100%</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0b0f19; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: #ffffff; overflow-x: hidden; }
+
+        .game-container {
+            background-color: #0d1220; width: 100%; max-width: 410px; height: 100vh; max-height: 900px;
+            display: flex; flex-direction: column; border-radius: 28px; overflow-y: auto;
+            box-shadow: 0 0 40px rgba(100, 50, 255, 0.25); border: 1.5px solid rgba(168, 85, 247, 0.4);
+            padding: 14px; position: relative; -webkit-overflow-scrolling: touch;
+        }
+
+        .game-container::-webkit-scrollbar { width: 4px; }
+        .game-container::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 10px; }
+
+        /* الهيدر العلوي */
+        .top-nav {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-shrink: 0; gap: 6px;
+        }
+        .back-arrow {
+            background: #131b2e; border: 1px solid rgba(56, 189, 248,.5); color: #38bdf8;
+            width: 36px; height: 36px; border-radius: 12px; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; font-size: 18px; font-weight: bold; flex-shrink: 0;
+        }
+        
+        /* زر تشغيل الهاك */
+        .hack-btn {
+            background: linear-gradient(135deg, #a855f7 0%, #6d28d9 100%);
+            border: 1.5px solid rgba(168, 85, 247, 0.9); color: white;
+            padding: 9px 18px; border-radius: 16px; font-size: 15px; font-weight: bold;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.5); transition: 0.2s;
+            flex-grow: 1; text-align: center;
+        }
+        .hack-btn.active {
+            background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.6);
+            border-color: #f87171;
+        }
+
+        .balance-pill {
+            background: #161b22; border: 1.5px solid rgba(16, 185, 129, 0.5); border-radius: 20px;
+            padding: 6px 12px; display: flex; align-items: center; gap: 6px; direction: ltr;
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.2); flex-shrink: 0;
+        }
+        .bal-val { font-size: 15px; font-weight: bold; color: #fde047; }
+        .plus-btn {
+            background: #10b981; color: #0d1220; width: 20px; height: 20px; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; font-weight: bold; cursor: pointer; font-size: 14px;
+        }
+
+        /* شاشة العرض */
+        .screen-box {
+            background: linear-gradient(135deg, #111726 0%, #090d16 100%);
+            border: 1.5px solid rgba(168, 85, 247, 0.4); border-radius: 20px;
+            height: 230px; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            position: relative; margin-bottom: 12px; overflow: hidden; flex-shrink: 0;
+            box-shadow: inset 0 0 25px rgba(0,0,0,0.6);
+        }
+
+        /* مستطيل توقع الهاك أعلى اليمين بدقة */
+        .hack-prediction-box {
+            display: none; position: absolute; top: 12px; right: 12px;
+            background: rgba(15, 23, 42, 0.9); border: 1.5px solid #a855f7; padding: 6px 14px;
+            border-radius: 12px; font-size: 16px; color: #fde047; font-weight: bold; z-index: 10;
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.6); text-align: center; direction: ltr;
+        }
+        .hack-prediction-box.show { display: block; }
+
+        .flight-path {
+            position: absolute; bottom: 20px; left: 20px; width: 0px; height: 3px;
+            background: linear-gradient(90deg, #fde047, #f97316); border-radius: 2px; z-index: 1;
+            transform-origin: left bottom; transition: 0.1s linear;
+        }
+
+        .countdown-wrapper {
+            position: absolute; bottom: 20px; right: 25px; display: flex; align-items: center; justify-content: center; z-index: 5;
+        }
+        .countdown-number { font-size: 48px; font-weight: bold; color: #ffffff; text-shadow: 0 0 15px rgba(255,255,255,0.6); }
+        .circle-dots {
+            position: absolute; width: 90px; height: 90px; border-radius: 50%; border: 2px dashed rgba(255,255,255,0.25);
+            animation: rotateDots 6s linear infinite;
+        }
+        @keyframes rotateDots { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .plane-graphic { position: absolute; bottom: 20px; left: 20px; font-size: 38px; z-index: 2; }
+        .multiplier-text {
+            font-size: 42px; font-weight: bold; color: #ffffff; text-shadow: 0 0 20px rgba(255,255,255,0.4);
+            z-index: 3; position: absolute; top: 50px; left: 20px;
+        }
+        .multiplier-text.crashed { color: #ef4444; text-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
+
+        /* لوحات الرهان */
+        .bet-card {
+            background: #111726; border: 1.5px solid rgba(168, 85, 247, 0.4); border-radius: 20px;
+            padding: 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+        }
+        .tabs-row { display: grid; grid-template-columns: 1fr 1fr; background: #090d16; border-radius: 12px; padding: 3px; gap: 3px; }
+        .tab-btn { background: none; border: none; color: #94a3b8; padding: 7px; font-size: 13px; font-weight: bold; border-radius: 10px; cursor: pointer; text-align: center; }
+        .tab-btn.active { background: #1f293d; color: #fde047; box-shadow: 0 0 10px rgba(0,0,0,0.4); }
+
+        .amount-control-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .ctrl-btn {
+            background: #1f293d; border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8;
+            width: 38px; height: 38px; border-radius: 12px; font-size: 18px; font-weight: bold;
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+        }
+        .amount-input-box {
+            flex-grow: 1; background: #ffffff; color: #0d1220; border-radius: 12px;
+            text-align: center; font-size: 17px; font-weight: bold; padding: 6px; border: none; outline: none;
+            box-shadow: 0 0 12px rgba(255,255,255,0.2); width: 100%;
+        }
+
+        .quick-amounts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+        .q-btn {
+            background: #192237; border: 1px solid rgba(255,255,255,0.06); color: #cbd5e1;
+            padding: 6px; border-radius: 10px; font-size: 13px; font-weight: bold; cursor: pointer; text-align: center;
+        }
+        .q-btn:active { background: #38bdf8; color: #0d1220; }
+
+        .auto-cashout-box {
+            display: none; align-items: center; justify-content: space-between; background: #090d16;
+            border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 12px; padding: 6px 12px; font-size: 13px; color: #94a3b8;
+        }
+        .auto-cashout-box.show { display: flex; }
+        .auto-cashout-box input { width: 70px; background: none; border: none; color: #fde047; font-size: 15px; font-weight: bold; text-align: center; outline: none; }
+
+        .btn-bet {
+            background: linear-gradient(135deg, #22c55e 0%, #15803d 100%); color: white; border: none;
+            width: 100%; padding: 13px; border-radius: 14px; font-size: 17px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4); text-align: center; transition: 0.1s;
+        }
+        .btn-bet.cancel { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
+        .btn-bet:active { transform: scale(0.98); }
+
+        .toast-msg {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background-color: #161b22; color: #ffffff; border: 1px solid rgba(56, 189, 248, 0.4);
+            padding: 10px 22px; border-radius: 20px; font-size: 13px; z-index: 9999; opacity: 0; transition: 0.3s; pointer-events: none;
+        }
+        .toast-msg.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        
+        <!-- الهيدر العلوي -->
+        <div class="top-nav">
+            <div class="back-arrow" onclick="goBack()">←</div>
+            <button class="hack-btn" id="hack-toggle-btn" onclick="toggleHack()">تشغيل الهاك</button>
+            <div class="balance-pill">
+                <div class="plus-btn" onclick="goToDeposit()">+</div>
+                <div class="bal-val" id="user-balance">ج.م 0.00</div>
+            </div>
+        </div>
+
+        <!-- شاشة العرض -->
+        <div class="screen-box" id="screen-box">
+            <!-- مستطيل توقع الهاك أعلى اليمين -->
+            <div class="hack-prediction-box" id="hack-box">0.00x</div>
+
+            <!-- العد التنازلي -->
+            <div class="countdown-wrapper" id="countdown-container">
+                <div class="circle-dots"></div>
+                <div class="countdown-number" id="countdown-display">7</div>
+            </div>
+
+            <!-- مسار الطائرة -->
+            <div class="flight-path" id="flight-path" style="display: none;"></div>
+
+            <!-- الطائرة ومضاعف الفوز -->
+            <div class="plane-graphic" id="plane" style="display: none;">✈️</div>
+            <div class="multiplier-text" id="multiplier" style="display: none;">1.00x</div>
+        </div>
+
+        <!-- لوحة الرهان 1 -->
+        <div class="bet-card">
+            <div class="tabs-row">
+                <button class="tab-btn active" id="tab-bet-1" onclick="switchTab(1, 'bet')">رهان</button>
+                <button class="tab-btn" id="tab-auto-1" onclick="switchTab(1, 'auto')">تلقائي</button>
+            </div>
+            
+            <div class="amount-control-row">
+                <div class="ctrl-btn" onclick="adjustAmount(1, -10)">-</div>
+                <input type="number" class="amount-input-box" id="input-amount-1" value="10" min="1" oninput="updateManualAmount(1, this.value)">
+                <div class="ctrl-btn" onclick="adjustAmount(1, 10)">+</div>
+            </div>
+
+            <div class="quick-amounts">
+                <div class="q-btn" onclick="setQuickAmount(1, 10)">10</div>
+                <div class="q-btn" onclick="setQuickAmount(1, 20)">20</div>
+                <div class="q-btn" onclick="setQuickAmount(1, 50)">50</div>
+                <div class="q-btn" onclick="setQuickAmount(1, 100)">100</div>
+            </div>
+
+            <div class="auto-cashout-box" id="auto-box-1">
+                <span>سحب تلقائي عند:</span>
+                <input type="number" id="auto-target-1" value="2.00" step="0.1" min="1.1">
+                <span>X</span>
+            </div>
+
+            <button class="btn-bet" id="bet-btn-1" onclick="handleBetAction(1)">راهنت (على الجولة القادمة)</button>
+        </div>
+
+        <!-- لوحة الرهان 2 -->
+        <div class="bet-card">
+            <div class="tabs-row">
+                <button class="tab-btn active" id="tab-bet-2" onclick="switchTab(2, 'bet')">رهان</button>
+                <button class="tab-btn" id="tab-auto-2" onclick="switchTab(2, 'auto')">تلقائي</button>
+            </div>
+            
+            <div class="amount-control-row">
+                <div class="ctrl-btn" onclick="adjustAmount(2, -10)">-</div>
+                <input type="number" class="amount-input-box" id="input-amount-2" value="10" min="1" oninput="updateManualAmount(2, this.value)">
+                <div class="ctrl-btn" onclick="adjustAmount(2, 10)">+</div>
+            </div>
+
+            <div class="quick-amounts">
+                <div class="q-btn" onclick="setQuickAmount(2, 10)">10</div>
+                <div class="q-btn" onclick="setQuickAmount(2, 20)">20</div>
+                <div class="q-btn" onclick="setQuickAmount(2, 50)">50</div>
+                <div class="q-btn" onclick="setQuickAmount(2, 100)">100</div>
+            </div>
+
+            <div class="auto-cashout-box" id="auto-box-2">
+                <span>سحب تلقائي عند:</span>
+                <input type="number" id="auto-target-2" value="2.00" step="0.1" min="1.1">
+                <span>X</span>
+            </div>
+
+            <button class="btn-bet" id="bet-btn-2" onclick="handleBetAction(2)">راهنت (على الجولة القادمة)</button>
+        </div>
+
+    </div>
+
+    <div class="toast-msg" id="toast">رسالة تنبيه</div>
+
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyBv5Tl96ZNAbtGhLHwhjFYsjlvx3J9pN2g", databaseURL: "https://project-4572c85f-9506-47dd-b9c-default-rtdb.firebaseio.com/" };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const userID = urlParams.get('id') || localStorage.getItem("user_id");
+
+        const userBalanceEl = document.getElementById('user-balance');
+        const countdownContainer = document.getElementById('countdown-container');
+        const countdownEl = document.getElementById('countdown-display');
+        const planeEl = document.getElementById('plane');
+        const multiplierEl = document.getElementById('multiplier');
+        const flightPath = document.getElementById('flight-path');
+        const hackBtn = document.getElementById('hack-toggle-btn');
+        const hackBox = document.getElementById('hack-box');
+        const toastEl = document.getElementById('toast');
+
+        let userBalance = 0;
+        let gameState = 'countdown';
+        let currentMultiplier = 1.00;
+        let crashPoint = 2.00;
+        let gameInterval = null;
+        let roundCounter = 0;
+        let hackActive = false;
+
+        let betsData = {
+            1: { amount: 10, mode: 'bet', status: 'idle' },
+            2: { amount: 10, mode: 'bet', status: 'idle' }
+        };
+
+        if (!userID) { window.location.replace("index.html"); }
+        else {
+            database.ref('User/' + userID).on('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    userBalance = snapshot.val().balance !== undefined ? parseFloat(snapshot.val().balance) : 0;
+                    userBalanceEl.innerText = "ج.م " + userBalance.toFixed(2);
+                }
+            });
+        }
+
+        function showToast(msg) {
+            toastEl.innerText = msg;
+            toastEl.classList.add('show');
+            setTimeout(() => toastEl.classList.remove('show'), 2000);
+        }
+
+        function toggleHack() {
+            hackActive = !hackActive;
+            if (hackActive) {
+                hackBtn.innerText = "إيقاف الهاك";
+                hackBtn.classList.add('active');
+                hackBox.classList.add('show');
+            } else {
+                hackBtn.innerText = "تشغيل الهاك";
+                hackBtn.classList.remove('active');
+                hackBox.classList.remove('show');
+            }
+        }
+
+        function switchTab(panelId, mode) {
+            betsData[panelId].mode = mode;
+            const betTab = document.getElementById(`tab-bet-${panelId}`);
+            const autoTab = document.getElementById(`tab-auto-${panelId}`);
+            const autoBox = document.getElementById(`auto-box-${panelId}`);
+
+            if (mode === 'auto') {
+                autoTab.className = "tab-btn active";
+                betTab.className = "tab-btn";
+                autoBox.classList.add('show');
+            } else {
+                betTab.className = "tab-btn active";
+                autoTab.className = "tab-btn";
+                autoBox.classList.remove('show');
+            }
+        }
+
+        function updateManualAmount(panelId, val) { betsData[panelId].amount = parseFloat(val) || 0; }
+        function adjustAmount(panelId, delta) {
+            let current = betsData[panelId].amount + delta;
+            if (current < 1) current = 1;
+            betsData[panelId].amount = current;
+            document.getElementById(`input-amount-${panelId}`).value = current;
+        }
+        function setQuickAmount(panelId, val) {
+            betsData[panelId].amount = val;
+            document.getElementById(`input-amount-${panelId}`).value = val;
+        }
+
+        function handleBetAction(panelId) {
+            const bet = betsData[panelId];
+            const btn = document.getElementById(`bet-btn-${panelId}`);
+
+            if (bet.status === 'idle') {
+                if (bet.amount <= 0) { showToast("أدخل مبلغ صحيح للرهان!"); return; }
+                if (bet.amount > userBalance) { showToast("رصيدك غير كافي!"); return; }
+                bet.status = 'placed';
+                btn.innerText = "إلغاء الرهان";
+                btn.className = "btn-bet cancel";
+                showToast("تم تسجيل رهانك للجولة القادمة!");
+            } else if (bet.status === 'placed') {
+                bet.status = 'idle';
+                btn.innerText = "راهنت (على الجولة القادمة)";
+                btn.className = "btn-bet";
+                showToast("تم إلغاء الرهان.");
+            } else if (bet.status === 'active') {
+                cashOut(panelId);
+            }
+        }
+
+        function cashOut(panelId) {
+            const bet = betsData[panelId];
+            if (bet.status !== 'active') return;
+
+            let profit = bet.amount * currentMultiplier;
+            userBalance += profit;
+            database.ref('User/' + userID + '/balance').set(userBalance);
+            showToast(`مبروك! ربحت ${profit.toFixed(2)} ج.م`);
+
+            bet.status = 'idle';
+            const btn = document.getElementById(`bet-btn-${panelId}`);
+            btn.innerText = "راهنت (على الجولة القادمة)";
+            btn.className = "btn-bet";
+        }
+
+        function startCountdown() {
+            gameState = 'countdown';
+            roundCounter++;
+
+            // النمط المطلوب بدقة: أول دورين أعلى من 7، والتالت أقل من 7
+            let generatedCrash = 0;
+            if (roundCounter % 3 === 0) {
+                generatedCrash = (Math.random() * 3.5 + 2.0); // دور عادي أقل من 7 (بين 2.0 و 5.5)
+            } else {
+                generatedCrash = (Math.random() * 8.0 + 7.2); // دورين عاليين أعلى من 7 (بين 7.2 و 15.2)
+            }
+            
+            // تثبيت رقم الانفجار برقمين عشريين دقيقين للغاية
+            crashPoint = parseFloat(generatedCrash.toFixed(2));
+
+            // عرض نفس الرقم فوراً في خانة الهاك
+            hackBox.innerText = crashPoint.toFixed(2) + "x";
+
+            let count = 7;
+            countdownContainer.style.display = "flex";
+            planeEl.style.display = "none";
+            multiplierEl.style.display = "none";
+            flightPath.style.display = "none";
+            countdownEl.innerText = count;
+
+            let timer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdownEl.innerText = count;
+                } else {
+                    clearInterval(timer);
+                    countdownContainer.style.display = "none";
+                    startFlight();
+                }
+            }, 1000);
+        }
+
+        function startFlight() {
+            gameState = 'flying';
+            currentMultiplier = 1.00;
+            
+            planeEl.style.display = "block";
+            multiplierEl.style.display = "block";
+            flightPath.style.display = "block";
+            multiplierEl.innerText = "1.00x";
+            multiplierEl.className = "multiplier-text";
+            planeEl.innerText = "✈️";
+            planeEl.style.transform = "translate(0px, 0px)";
+            flightPath.style.width = "0px";
+            flightPath.style.transform = "rotate(0deg)";
+
+            [1, 2].forEach(id => {
+                const bet = betsData[id];
+                const btn = document.getElementById(`bet-btn-${id}`);
+                if (bet.status === 'placed') {
+                    userBalance -= bet.amount;
+                    database.ref('User/' + userID + '/balance').set(userBalance);
+                    bet.status = 'active';
+                    btn.innerText = "سحب الأرباح";
+                    btn.className = "btn-bet";
+                    btn.style.background = "linear-gradient(135deg, #22c55e 0%, #15803d 100%)";
+                }
+            });
+
+            let posX = 0;
+            let posY = 0;
+            let length = 0;
+
+            gameInterval = setInterval(() => {
+                currentMultiplier += 0.04;
+
+                // التحقق المباشر من مطابقة الرقم بالمللي قبل التحديث
+                if (currentMultiplier >= crashPoint) {
+                    currentMultiplier = crashPoint; // تثبيت المضاعف عند رقم الهاك بالضبط
+                    multiplierEl.innerText = currentMultiplier.toFixed(2) + "x";
+                    clearInterval(gameInterval);
+                    triggerCrash();
+                    return;
+                }
+
+                multiplierEl.innerText = currentMultiplier.toFixed(2) + "x";
+
+                posX += 3.2;
+                posY -= 2.0;
+                length += 3.8;
+
+                if(posX < 200) {
+                    planeEl.style.transform = `translate(${posX}px, ${posY}px)`;
+                    flightPath.style.width = length + "px";
+                    flightPath.style.transform = `rotate(-32deg)`;
+                }
+
+                [1, 2].forEach(id => {
+                    const bet = betsData[id];
+                    if (bet.status === 'active' && bet.mode === 'auto') {
+                        let target = parseFloat(document.getElementById(`auto-target-${id}`).value);
+                        if (currentMultiplier >= target) {
+                            cashOut(id);
+                        }
+                    }
+                });
+            }, 80);
+        }
+
+        function triggerCrash() {
+            gameState = 'crashed';
+            multiplierEl.innerText = crashPoint.toFixed(2) + "x 💥";
+            multiplierEl.className = "multiplier-text crashed";
+            planeEl.innerText = "💥";
+
+            [1, 2].forEach(id => {
+                const bet = betsData[id];
+                if (bet.status === 'active') {
+                    bet.status = 'idle';
+                    const btn = document.getElementById(`bet-btn-${id}`);
+                    btn.innerText = "راهنت (على الجولة القادمة)";
+                    btn.className = "btn-bet";
+                }
+            });
+
+            setTimeout(startCountdown, 3000);
+        }
+
+        function goBack() { window.location.href = "dashboard.html?id=" + userID; }
+        function goToDeposit() { window.location.href = "deposit.html?id=" + userID; }
+
+        startCountdown();
+    </script>
+</body>
+</html>

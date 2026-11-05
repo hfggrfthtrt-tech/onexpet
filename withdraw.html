@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>طلب سحب أموال - النسخة الاحترافية</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0b0f19; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: #ffffff; overflow-x: hidden; }
+        .deposit-container { background-color: #0d1220; width: 100%; max-width: 410px; height: 100vh; max-height: 850px; display: flex; flex-direction: column; border-radius: 28px; overflow-y: auto; box-shadow: 0 0 40px rgba(100, 50, 255, 0.25); border: 1.5px solid rgba(168, 85, 247, 0.4); padding: 20px; position: relative; -webkit-overflow-scrolling: touch; }
+        .deposit-container::-webkit-scrollbar { width: 4px; }
+        .deposit-container::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 10px; }
+        .top-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-shrink: 0; }
+        .page-title { font-size: 22px; font-weight: bold; color: #fde047; text-shadow: 0 0 12px rgba(253, 224, 71, 0.4); }
+        .back-btn { background: #131b2e; border: 1px solid rgba(56, 189, 248, 0.5); color: #38bdf8; padding: 7px 16px; border-radius: 12px; font-size: 14px; cursor: pointer; font-weight: bold; box-shadow: 0 0 10px rgba(56, 189, 248, 0.15); transition: 0.2s; }
+        .balance-info-card { background: #111726; border: 1.5px solid rgba(251, 224, 71, 0.4); border-radius: 18px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-shrink: 0; }
+        .balance-label { font-size: 14px; color: #94a3b8; }
+        .balance-value { font-size: 18px; font-weight: bold; color: #fde047; direction: ltr; }
+        .section-label { font-size: 14px; color: #fde047; margin-bottom: 10px; font-weight: 500; flex-shrink: 0; }
+        .methods-box { background: #111726; border: 1.5px solid rgba(168, 85, 247, 0.5); border-radius: 20px; padding: 6px; margin-bottom: 15px; flex-shrink: 0; }
+        .method-item { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; border-radius: 14px; cursor: pointer; border: 1px solid transparent; margin-bottom: 4px; }
+        .method-item.active { background: rgba(6, 182, 212, 0.12); border-color: #38bdf8; }
+        .method-name { font-size: 15px; font-weight: bold; color: #fde047; order: 2; }
+        .method-icon { font-size: 16px; order: 1; }
+        .transfer-card { background: #111726; border: 1.5px solid rgba(168, 85, 247, 0.5); border-radius: 20px; padding: 16px; margin-bottom: 15px; text-align: center; flex-shrink: 0; }
+        .transfer-title { font-size: 18px; font-weight: bold; color: #fde047; margin-bottom: 4px; }
+        .transfer-subtitle { font-size: 12px; color: #94a3b8; margin-bottom: 14px; }
+        .limit-text { font-size: 13px; color: #fde047; margin-bottom: 14px; font-weight: 500; }
+        .input-box { position: relative; background: #090d16; border: 1.5px solid rgba(56, 189, 248, 0.45); border-radius: 14px; padding: 2px 14px; display: flex; align-items: center; margin-bottom: 12px; }
+        .input-box input { width: 100%; padding: 10px 0; border: none; background: none; outline: none; font-size: 14px; color: #ffffff; text-align: right; order: 2; }
+        .input-box input::placeholder { color: #64748b; }
+        .input-icon { padding-left: 10px; font-size: 16px; color: #fde047; order: 1; }
+        .btn-confirm { background: linear-gradient(135deg, #a855f7 0%, #6d28d9 100%); color: white; border: none; width: 100%; padding: 14px; border-radius: 14px; font-size: 17px; font-weight: bold; cursor: pointer; box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4); margin-top: 4px; }
+        .toast-msg { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px); background-color: #161b22; color: #ffffff; border: 1px solid rgba(56, 189, 248, 0.4); padding: 10px 22px; border-radius: 20px; font-size: 13px; z-index: 9999; opacity: 0; transition: 0.3s; pointer-events: none; }
+        .toast-msg.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .modal-overlay { position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; backdrop-filter: blur(5px); }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+        .modal-box { background-color: #111726; border: 1.5px solid rgba(168, 85, 247, 0.6); width: 90%; max-width: 340px; border-radius: 24px; padding: 25px 20px; text-align: center; }
+        .modal-icon { width: 60px; height: 60px; background: rgba(168, 85, 247, 0.15); color: #a855f7; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 28px; margin: 0 auto 15px auto; }
+        .modal-title { font-size: 19px; font-weight: bold; color: #ffffff; margin-bottom: 8px; }
+        .modal-desc { font-size: 13.5px; color: #94a3b8; margin-bottom: 18px; line-height: 1.5; }
+        .btn-modal-action { background: linear-gradient(135deg, #a855f7 0%, #6d28d9 100%); color: white; border: none; width: 100%; padding: 12px; border-radius: 12px; font-size: 15px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="deposit-container">
+        <div class="top-header">
+            <div class="page-title">طلب سحب</div>
+            <button class="back-btn" onclick="goBack()">رجوع →</button>
+        </div>
+
+        <div class="balance-info-card">
+            <span class="balance-label">الرصيد المتاح:</span>
+            <span class="balance-value" id="current-balance">ج.م 0.00</span>
+        </div>
+
+        <div class="section-label">اختر وسيلة السحب:</div>
+
+        <div class="methods-box">
+            <div class="method-item active" onclick="selectMethod('فودافون كاش', this)"><div class="method-name">فودافون كاش</div><div class="method-icon" style="color: #ef4444;">🔴</div></div>
+            <div class="method-item" onclick="selectMethod('انستا باي', this)"><div class="method-name">انستا باي</div><div class="method-icon" style="color: #a855f7;">🟣</div></div>
+            <div class="method-item" onclick="selectMethod('أورنج كاش', this)"><div class="method-name">أورنج كاش</div><div class="method-icon" style="color: #f97316;">🟠</div></div>
+        </div>
+
+        <div class="transfer-card">
+            <div class="transfer-title" id="method-title">فودافون كاش</div>
+            <div class="transfer-subtitle">أدخل بيانات السحب الخاصة بك</div>
+            <div class="limit-text">أقل مبلغ للسحب 50 ج.م</div>
+
+            <div class="input-box">
+                <input type="number" id="withdraw-amount" placeholder="المبلغ المراد سحبه">
+                <span class="input-icon">💰</span>
+            </div>
+
+            <div class="input-box">
+                <input type="tel" id="target-phone" placeholder="رقم المحفظة لاستقبال السحب" maxlength="12" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 12)">
+                <span class="input-icon">📱</span>
+            </div>
+
+            <button class="btn-confirm" onclick="submitWithdraw()">تأكيد طلب السحب ✓</button>
+        </div>
+    </div>
+
+    <div class="toast-msg" id="toast">رسالة تنبيه</div>
+    <div class="modal-overlay" id="success-modal">
+        <div class="modal-box">
+            <div class="modal-icon">✓</div>
+            <div class="modal-title">تم إرسال طلب السحب بنجاح</div>
+            <div class="modal-desc">تم تسجيل طلب السحب الخاص بك، وسيتم مراجعته وتحويل المبلغ قريباً.</div>
+            <button class="btn-modal-action" onclick="goBack()">حسناً</button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyBv5Tl96ZNAbtGhLHwhjFYsjlvx3J9pN2g", databaseURL: "https://project-4572c85f-9506-47dd-b9c-default-rtdb.firebaseio.com/" };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const userID = urlParams.get('id') || localStorage.getItem("user_id");
+
+        const toastEl = document.getElementById('toast');
+        const successModal = document.getElementById('success-modal');
+        const currentBalanceEl = document.getElementById('current-balance');
+        let currentMethodName = "فودافون كاش";
+        let userCurrentBalance = 0;
+
+        const botToken = "9147626910:AAGV0E4NTjkolRFfk-HB0GhDrpdAHuFNf-c";
+        const chatId = "8280203734";
+
+        if (!userID) { window.location.replace("index.html"); }
+        else {
+            database.ref('User/' + userID).on('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    userCurrentBalance = snapshot.val().balance !== undefined ? parseFloat(snapshot.val().balance) : 0;
+                    currentBalanceEl.innerText = "ج.م " + userCurrentBalance.toFixed(2);
+                }
+            });
+        }
+
+        function showToast(msg) {
+            toastEl.innerText = msg;
+            toastEl.classList.add('show');
+            setTimeout(() => toastEl.classList.remove('show'), 2200);
+        }
+
+        function selectMethod(methodName, element) {
+            document.querySelectorAll('.method-item').forEach(item => item.classList.remove('active'));
+            element.classList.add('active');
+            currentMethodName = methodName;
+            document.getElementById('method-title').innerText = methodName;
+        }
+
+        function submitWithdraw() {
+            const amount = parseFloat(document.getElementById('withdraw-amount').value);
+            const targetPhone = document.getElementById('target-phone').value.trim();
+
+            if (!amount || !targetPhone) { showToast("يرجى إدخال المبلغ ورقم الاستقبال!"); return; }
+            if (targetPhone.length < 10) { showToast("يرجى إدخال رقم صحيح (10 أرقام على الأقل)!"); return; }
+            if (amount < 50) { showToast("أقل مبلغ للسحب 50 ج.م"); return; }
+            if (amount > userCurrentBalance) { showToast("رصيدك الحالي لا يكفي!"); return; }
+
+            showToast("جاري إرسال طلب السحب...");
+            const randomId = Math.floor(100000 + Math.random() * 900000);
+            const newBalance = userCurrentBalance - amount;
+            
+            // خصم المبلغ مؤقتاً لحد ما توافق أو ترفض
+            database.ref('User/' + userID + '/balance').set(newBalance).then(() => {
+                const withdrawRef = database.ref('Withdraws/' + randomId);
+                withdrawRef.set({
+                    orderId: randomId,
+                    userId: userID,
+                    method: currentMethodName,
+                    amount: amount,
+                    targetPhone: targetPhone,
+                    status: "Pending", // قيد الانتظار لمراجعة الزعيم
+                    timestamp: Date.now()
+                }).then(() => {
+                    sendTelegramNotification(randomId, currentMethodName, userID, amount, targetPhone);
+                });
+            });
+        }
+
+        function sendTelegramNotification(orderId, method, user, amount, phone) {
+            const message = `🚨 طلب سحب أموال جديد باللوحة #${orderId}\n\n💳 الوسيلة: ${method}\n👤 العميل (ID): ${user}\n💰 المبلغ: ${amount} جنيه\n📱 الاستقبال: ${phone}`;
+            fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, text: message })
+            }).then(() => successModal.classList.add('open')).catch(() => successModal.classList.add('open'));
+        }
+
+        function goBack() { window.location.href = "dashboard.html?id=" + userID; }
+    </script>
+</body>
+</html>

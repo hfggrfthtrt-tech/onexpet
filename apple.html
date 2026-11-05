@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>تفاحة الحظ - مع نظام الهاك المطور</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
+        body { background-color: #05130b; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: #ffffff; overflow-x: hidden; }
+
+        .game-container {
+            background: linear-gradient(180deg, #0a2215 0%, #030d07 100%);
+            width: 100%; max-width: 410px; height: 100vh; max-height: 890px;
+            display: flex; flex-direction: column; border-radius: 24px; overflow-y: auto;
+            box-shadow: 0 0 35px rgba(0, 255, 100, 0.15); border: 1.5px solid rgba(46, 204, 113, 0.3);
+            position: relative; -webkit-overflow-scrolling: touch;
+        }
+
+        .top-nav {
+            display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; flex-shrink: 0; background: rgba(0, 0, 0, 0.4); gap: 6px;
+        }
+        .back-arrow {
+            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff;
+            width: 34px; height: 34px; border-radius: 10px; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; font-size: 16px; font-weight: bold; flex-shrink: 0;
+        }
+        
+        .hack-btn {
+            background: linear-gradient(135deg, #a855f7 0%, #6d28d9 100%);
+            border: 1.5px solid rgba(168, 85, 247, 0.9); color: white;
+            padding: 7px 12px; border-radius: 14px; font-size: 14px; font-weight: bold;
+            cursor: pointer; box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4); transition: 0.2s;
+            flex-grow: 1; text-align: center;
+        }
+        .hack-btn.active {
+            background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+            border-color: #f87171;
+        }
+
+        .balance-pill {
+            background: rgba(0, 0, 0, 0.6); border: 1.5px solid #2ecc71; border-radius: 20px;
+            padding: 4px 10px; display: flex; align-items: center; gap: 6px; direction: ltr; flex-shrink: 0;
+        }
+        .bal-val { font-size: 14px; font-weight: bold; color: #fff; }
+        .plus-btn {
+            background: #2ecc71; color: #000; width: 18px; height: 18px; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; font-weight: bold; cursor: pointer; font-size: 13px;
+        }
+
+        .title-bar { text-align: center; font-size: 13px; font-weight: bold; color: #a2d9ce; letter-spacing: 1px; padding: 4px 0; }
+
+        .board-viewport {
+            flex-grow: 1; display: flex; flex-direction: column-reverse; justify-content: flex-start;
+            padding: 10px 12px; gap: 6px; overflow-y: auto; position: relative;
+        }
+
+        .row-card {
+            display: flex; align-items: center; gap: 8px; position: relative; opacity: 0.4; transition: 0.3s;
+        }
+        .row-card.active-row { opacity: 1; transform: scale(1.02); }
+        .row-card.completed-row { opacity: 0.9; }
+
+        .multiplier-badge {
+            background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff; font-size: 11px; font-weight: bold; padding: 6px 4px; border-radius: 8px;
+            width: 58px; text-align: center; flex-shrink: 0;
+        }
+        .row-card.active-row .multiplier-badge {
+            background: #2ecc71; color: #000; border-color: #2ecc71; box-shadow: 0 0 10px rgba(46, 204, 113, 0.6);
+        }
+
+        .apples-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; flex-grow: 1;
+        }
+
+        .apple-cell {
+            aspect-ratio: 1; background: radial-gradient(circle, #2c3e50 0%, #1a252f 100%);
+            border: 1.5px solid #34495e; border-radius: 50%; display: flex;
+            justify-content: center; align-items: center; cursor: pointer; font-size: 18px;
+            box-shadow: inset 0 2px 5px rgba(255,255,255,0.1), 0 3px 6px rgba(0,0,0,0.5);
+            transition: 0.2s transform; position: relative; color: #f1c40f; font-weight: bold;
+        }
+        .apple-cell:active { transform: scale(0.9); }
+
+        /* تلميح الهاك: التفاحة السليمة والفاسدة المقطومة */
+        .apple-cell.hack-good::after {
+            content: '🍎';
+            position: absolute; font-size: 14px; background: rgba(46, 204, 113, 0.85);
+            border-radius: 50%; width: 22px; height: 22px; display: flex;
+            justify-content: center; align-items: center; border: 1px solid #fff;
+        }
+        .apple-cell.hack-bad::after {
+            content: '🍏';
+            position: absolute; font-size: 14px; background: rgba(231, 76, 60, 0.85);
+            border-radius: 50%; width: 22px; height: 22px; display: flex;
+            justify-content: center; align-items: center; border: 1px solid #fff; opacity: 0.7;
+        }
+
+        .apple-cell.opened-good {
+            background: radial-gradient(circle, #27ae60 0%, #1e8449 100%); border-color: #2ecc71;
+            box-shadow: 0 0 12px rgba(46, 204, 113, 0.8);
+        }
+        .apple-cell.opened-bad {
+            background: radial-gradient(circle, #c0392b 0%, #78281f 100%); border-color: #e74c3c;
+            box-shadow: 0 0 12px rgba(231, 76, 60, 0.8);
+        }
+
+        .bottom-panel {
+            background: #09170e; border-top: 1px solid rgba(46, 204, 113, 0.2);
+            padding: 12px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+        }
+
+        .quick-multiplier-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .q-btn {
+            background: #142a1d; border: 1px solid rgba(255,255,255,0.1); color: #2ecc71;
+            padding: 6px; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center;
+        }
+
+        .bet-input-box {
+            display: flex; background: #030a05; border: 1px solid rgba(46, 204, 113, 0.4);
+            border-radius: 12px; padding: 4px 10px; align-items: center; justify-content: space-between;
+        }
+        .bet-input-box input {
+            background: none; border: none; color: #fff; font-size: 16px; font-weight: bold; text-align: center; outline: none; width: 100%;
+        }
+
+        .action-btn {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; border: none;
+            width: 100%; padding: 12px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4); text-align: center;
+        }
+        .action-btn.cashout {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+        }
+
+        .overlay-msg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); display: none; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 100; text-align: center; padding: 20px;
+        }
+        .overlay-msg h2 { font-size: 26px; margin-bottom: 8px; }
+        .overlay-msg p { font-size: 18px; color: #f1c40f; margin-bottom: 20px; }
+        .overlay-msg button {
+            background: #2ecc71; color: #000; border: none; padding: 10px 25px; border-radius: 12px;
+            font-size: 16px; font-weight: bold; cursor: pointer;
+        }
+
+        .toast-msg {
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+            background-color: #161b22; color: #ffffff; border: 1px solid #2ecc71;
+            padding: 8px 18px; border-radius: 20px; font-size: 13px; z-index: 999; opacity: 0; transition: 0.3s; pointer-events: none;
+        }
+        .toast-msg.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        
+        <div class="top-nav">
+            <div class="back-arrow" onclick="goBack()">←</div>
+            <button class="hack-btn" id="hack-toggle-btn" onclick="toggleHack()">تشغيل الهاك</button>
+            <div class="balance-pill">
+                <div class="plus-btn" onclick="goToDeposit()">+</div>
+                <div class="bal-val" id="user-balance">ج.م 0.00</div>
+            </div>
+        </div>
+
+        <div class="title-bar">APPLE OF FORTUNE</div>
+
+        <div class="board-viewport" id="board"></div>
+
+        <div class="bottom-panel">
+            <div class="quick-multiplier-row">
+                <div class="q-btn" onclick="setQuickBet(10)">أدنى (10)</div>
+                <div class="q-btn" onclick="multiplyBet(0.5)">X/2</div>
+                <div class="q-btn" onclick="multiplyBet(2)">X2</div>
+                <div class="q-btn" onclick="setQuickBet(5000)">أقصى (5000)</div>
+            </div>
+
+            <div class="bet-input-box">
+                <span style="color:#2ecc71; font-weight:bold;">ج.م</span>
+                <input type="number" id="bet-amount" value="10" min="10" max="5000">
+            </div>
+
+            <button class="action-btn" id="main-btn" onclick="startPlay()">الرهان</button>
+        </div>
+
+        <div class="overlay-msg" id="overlay">
+            <h2 id="overlay-title">فوز!</h2>
+            <p id="overlay-desc">ربحت 0.00 ج.م</p>
+            <button onclick="closeOverlay()">العب مرة أخرى</button>
+        </div>
+
+    </div>
+
+    <div class="toast-msg" id="toast">رسالة تنبيه</div>
+
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyBv5Tl96ZNAbtGhLHwhjFYsjlvx3J9pN2g", databaseURL: "https://project-4572c85f-9506-47dd-b9c-default-rtdb.firebaseio.com/" };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const userID = urlParams.get('id') || localStorage.getItem("user_id");
+
+        const multipliers = [1.23, 1.54, 1.93, 2.41, 4.02, 6.71, 11.18, 27.97, 69.93, 349.68];
+        const badApplesCount = [1, 1, 1, 1, 2, 2, 2, 3, 3, 4];
+
+        let userBalance = 0;
+        let currentStep = 0;
+        let isPlaying = false;
+        let currentBet = 10;
+        let boardData = [];
+        let hackActive = false;
+
+        const balanceEl = document.getElementById('user-balance');
+        const boardEl = document.getElementById('board');
+        const mainBtn = document.getElementById('main-btn');
+        const hackBtn = document.getElementById('hack-toggle-btn');
+        const toastEl = document.getElementById('toast');
+
+        if (!userID) { window.location.replace("index.html"); }
+        else {
+            database.ref('User/' + userID).on('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    userBalance = snapshot.val().balance !== undefined ? parseFloat(snapshot.val().balance) : 0;
+                    balanceEl.innerText = "ج.م " + userBalance.toFixed(2);
+                }
+            });
+        }
+
+        function showToast(msg) {
+            toastEl.innerText = msg;
+            toastEl.classList.add('show');
+            setTimeout(() => toastEl.classList.remove('show'), 2000);
+        }
+
+        function toggleHack() {
+            hackActive = !hackActive;
+            if (hackActive) {
+                hackBtn.innerText = "إيقاف الهاك";
+                hackBtn.classList.add('active');
+                showToast("تم تفعيل الهاك بنجاح!");
+            } else {
+                hackBtn.innerText = "تشغيل الهاك";
+                hackBtn.classList.remove('active');
+                showToast("تم إيقاف الهاك.");
+            }
+            renderBoard();
+        }
+
+        function renderBoard() {
+            boardEl.innerHTML = '';
+            for (let r = 0; r < 10; r++) {
+                const rowCard = document.createElement('div');
+                rowCard.className = `row-card ${r === currentStep && isPlaying ? 'active-row' : ''}`;
+                rowCard.id = `row-${r}`;
+
+                const badge = document.createElement('div');
+                badge.className = 'multiplier-badge';
+                badge.innerText = `x ${multipliers[r]}`;
+                rowCard.appendChild(badge);
+
+                const grid = document.createElement('div');
+                grid.className = 'apples-grid';
+
+                for (let c = 0; c < 5; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'apple-cell';
+                    cell.id = `cell-${r}-${c}`;
+                    cell.innerText = '🍄';
+
+                    // إذا كان الهاك مفعلاً والجولة قائمة
+                    if (hackActive && isPlaying && boardData.length > 0) {
+                        if (boardData[r][c] === 'good') {
+                            cell.classList.add('hack-good');
+                        } else {
+                            cell.classList.add('hack-bad');
+                        }
+                    }
+
+                    cell.onclick = () => selectApple(r, c);
+                    grid.appendChild(cell);
+                }
+
+                rowCard.appendChild(grid);
+                boardEl.appendChild(rowCard);
+            }
+        }
+
+        function setQuickBet(val) {
+            let target = Math.min(val, userBalance);
+            if (target < 10) target = 10;
+            document.getElementById('bet-amount').value = target;
+        }
+
+        function multiplyBet(factor) {
+            let input = document.getElementById('bet-amount');
+            let newBet = parseFloat(input.value) * factor;
+            if (newBet < 10) newBet = 10;
+            if (newBet > 5000) newBet = 5000;
+            input.value = Math.min(newBet, userBalance);
+        }
+
+        function generateBoardData() {
+            boardData = [];
+            for (let r = 0; r < 10; r++) {
+                let badCount = badApplesCount[r];
+                let row = Array(5).fill('good');
+                let count = 0;
+                while (count < badCount) {
+                    let randIdx = Math.floor(Math.random() * 5);
+                    if (row[randIdx] !== 'bad') {
+                        row[randIdx] = 'bad';
+                        count++;
+                    }
+                }
+                boardData.push(row);
+            }
+        }
+
+        function startPlay() {
+            if (isPlaying) {
+                if (currentStep === 0) {
+                    showToast("يجب فتح تفاحة سليمة واحدة على الأقل للسحب!");
+                    return;
+                }
+                cashOut();
+                return;
+            }
+
+            currentBet = parseFloat(document.getElementById('bet-amount').value);
+            if (isNaN(currentBet) || currentBet < 10) { showToast("أقل مبلغ للرهان هو 10 ج.م!"); return; }
+            if (currentBet > 5000) { showToast("أقصى مبلغ للرهان هو 5000 ج.م!"); return; }
+            if (currentBet > userBalance) { showToast("رصيدك غير كافي!"); return; }
+
+            userBalance -= currentBet;
+            database.ref('User/' + userID + '/balance').set(userBalance);
+
+            isPlaying = true;
+            currentStep = 0;
+            generateBoardData();
+            renderBoard();
+
+            mainBtn.innerText = "خذ الأرباح";
+            mainBtn.className = "action-btn cashout";
+        }
+
+        function selectApple(r, c) {
+            if (!isPlaying || r !== currentStep) return;
+
+            const isGood = boardData[r][c] === 'good';
+            const cellEl = document.getElementById(`cell-${r}-${c}`);
+            cellEl.classList.remove('hack-good', 'hack-bad');
+
+            if (isGood) {
+                cellEl.innerText = '🍎';
+                cellEl.classList.add('opened-good');
+                
+                document.getElementById(`row-${r}`).classList.remove('active-row');
+                document.getElementById(`row-${r}`).classList.add('completed-row');
+                
+                currentStep++;
+
+                if (currentStep < 10) {
+                    document.getElementById(`row-${currentStep}`).classList.add('active-row');
+                    let currentProfit = (currentBet * multipliers[currentStep - 1]).toFixed(2);
+                    mainBtn.innerText = `خذ الأرباح (${currentProfit} ج.م)`;
+                } else {
+                    cashOut();
+                }
+            } else {
+                cellEl.innerText = '🍏';
+                cellEl.classList.add('opened-bad');
+                endGame();
+            }
+        }
+
+        function cashOut() {
+            if (currentStep === 0) {
+                showToast("يجب اختيار تفاحة سليمة أولاً!");
+                return;
+            }
+            let winAmount = (currentBet * multipliers[currentStep - 1]).toFixed(2);
+            userBalance += parseFloat(winAmount);
+            database.ref('User/' + userID + '/balance').set(userBalance);
+
+            showOverlay(true, winAmount);
+            resetGameState();
+        }
+
+        function endGame() {
+            showOverlay(false, 0);
+            resetGameState();
+        }
+
+        function resetGameState() {
+            isPlaying = false;
+            currentStep = 0;
+            mainBtn.innerText = "الرهان";
+            mainBtn.className = "action-btn";
+        }
+
+        function showOverlay(isWin, amount) {
+            const overlay = document.getElementById('overlay');
+            const title = document.getElementById('overlay-title');
+            const desc = document.getElementById('overlay-desc');
+
+            if (isWin) {
+                title.innerText = "فوز! 🎉";
+                title.style.color = "#2ecc71";
+                desc.innerText = `ربحت ${amount} ج.م`;
+            } else {
+                title.innerText = "حظ أوفر في المرة القادمة! 💔";
+                title.style.color = "#e74c3c";
+                desc.innerText = "حاول مرة أخرى";
+            }
+            overlay.style.display = "flex";
+        }
+
+        function closeOverlay() {
+            document.getElementById('overlay').style.display = "none";
+            renderBoard();
+        }
+
+        function goBack() { window.location.href = "dashboard.html?id=" + userID; }
+        function goToDeposit() { window.location.href = "deposit.html?id=" + userID; }
+
+        renderBoard();
+    </script>
+</body>
+</html>

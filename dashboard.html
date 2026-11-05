@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة التحكم - المنصة الاحترافية</title>
+    <!-- مكتبات Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        body {
+            background-color: #0d1117;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #ffffff;
+        }
+
+        .dashboard-container {
+            background-color: #161b22;
+            width: 100%;
+            max-width: 410px;
+            min-height: 100vh;
+            max-height: 900px;
+            display: flex;
+            flex-direction: column;
+            border-radius: 24px;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 20px;
+        }
+
+        /* شبكة الأجزاء العلوية مطابقة للصورة تماماً */
+        .account-top-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .card-box {
+            background: #1f293d;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 18px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            min-height: 95px;
+        }
+
+        .card-title {
+            font-size: 13px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        /* تصميم بطاقة الرصيد */
+        .balance-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            direction: ltr;
+        }
+
+        .card-value-balance {
+            font-size: 19px;
+            font-weight: bold;
+            color: #fbbf24;
+        }
+
+        .add-balance-icon {
+            width: 24px;
+            height: 24px;
+            background: #fbbf24;
+            color: #0f172a;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* تصميم بطاقة المعرف */
+        .card-value-id {
+            font-size: 16px;
+            font-weight: bold;
+            color: #38bdf8;
+            direction: ltr;
+            text-align: right;
+        }
+
+        .id-icon-corner {
+            position: absolute;
+            bottom: 10px;
+            left: 12px;
+            font-size: 16px;
+            color: #94a3b8;
+        }
+
+        /* أزرار الإجراءات (سحب وإيداع) */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .action-btn {
+            border: none;
+            border-radius: 18px;
+            padding: 16px 10px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+        .action-btn:active { transform: scale(0.97); }
+
+        .btn-deposit {
+            background: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%);
+        }
+
+        .btn-withdraw {
+            background: linear-gradient(135deg, #a855f7 0%, #6d28d9 100%);
+        }
+
+        /* زر سجل المعاملات */
+        .transactions-btn {
+            background: #1f293d;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 18px;
+            padding: 15px;
+            color: #38bdf8;
+            font-size: 15px;
+            font-weight: bold;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: background 0.2s;
+        }
+        .transactions-btn:hover { background: rgba(56, 189, 248, 0.1); }
+
+        /* عنوان الألعاب */
+        .section-heading {
+            font-size: 17px;
+            font-weight: bold;
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        /* تصميم بطاقات الألعاب الجديدة المطابقة للروابط */
+        .game-card-img {
+            width: 100%;
+            height: 110px;
+            border-radius: 18px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .game-card-img:hover {
+            transform: translateY(-2px);
+            border-color: #38bdf8;
+        }
+        .game-card-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Toast Notice */
+        .toast-msg {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background-color: #1f293d;
+            color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px 24px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 9999;
+            opacity: 0;
+            transition: 0.3s;
+            pointer-events: none;
+        }
+        .toast-msg.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        
+        <!-- الترتيب العلوي المطابق للصورة: معرف الحساب يمين، والرصيد الحالي يسار -->
+        <div class="account-top-grid">
+            <div class="card-box">
+                <div class="card-title">معرف الحساب (ID)</div>
+                <div class="card-value-id" id="user-id-display">ID: ...</div>
+                <div class="id-icon-corner">🏠</div>
+            </div>
+            <div class="card-box">
+                <div class="card-title">الرصيد الحالي</div>
+                <div class="balance-row">
+                    <div class="add-balance-icon" onclick="goToPage('deposit.html')">+</div>
+                    <div class="card-value-balance" id="user-balance">ج.م 0.00</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- أزرار الإجراءات -->
+        <div class="actions-grid">
+            <button class="action-btn btn-deposit" onclick="goToPage('deposit.html')">
+                <span>إيداع أموال</span> 📥
+            </button>
+            <button class="action-btn btn-withdraw" onclick="goToPage('withdraw.html')">
+                <span>طلب سحب</span> 📤
+            </button>
+        </div>
+
+        <!-- سجل المعاملات -->
+        <div class="transactions-btn" onclick="goToPage('transactions.html')">
+            سجل المعاملات (السحب والإيداع)
+        </div>
+
+        <!-- الألعاب المتاحة -->
+        <div class="section-heading">الألعاب المتاحة</div>
+
+        <!-- لعبة Crash (الطائرة) بالصورة الجديدة -->
+        <div class="game-card-img" onclick="goToPage('crash.html')">
+            <img src="https://i.postimg.cc/6q2HM5m0/file-0000000045108210a646cd7c0afd27da.png" alt="Crash Game">
+        </div>
+
+        <!-- لعبة Apple Of Fortune (التفاحة) بالصورة الجديدة -->
+        <div class="game-card-img" onclick="goToPage('apple.html')">
+            <img src="https://i.postimg.cc/Gmx1FqYx/file-00000000f4208210b205b03712772098.png" alt="Apple of Fortune">
+        </div>
+
+    </div>
+
+    <div class="toast-msg" id="toast">جاري التوجيه...</div>
+
+    <script>
+        // إعدادات الـ Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBv5Tl96ZNAbtGhLHwhjFYsjlvx3J9pN2g", 
+            databaseURL: "https://project-4572c85f-9506-47dd-b9c-default-rtdb.firebaseio.com/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        let userID = urlParams.get('id');
+
+        if (userID) {
+            localStorage.setItem("user_id", userID);
+        } else {
+            userID = localStorage.getItem("user_id");
+        }
+
+        const userIdDisplay = document.getElementById('user-id-display');
+        const userBalanceEl = document.getElementById('user-balance');
+        const toastEl = document.getElementById('toast');
+
+        function showToast(msg) {
+            toastEl.innerText = msg;
+            toastEl.classList.add('show');
+            setTimeout(() => toastEl.classList.remove('show'), 2000);
+        }
+
+        if (!userID) {
+            showToast("يرجى تسجيل الدخول أولاً!");
+            setTimeout(() => { window.location.replace("index.html"); }, 1000);
+        } else {
+            userIdDisplay.innerText = "ID: " + userID;
+
+            const userRef = database.ref('User/' + userID);
+            userRef.once('value').then((snapshot) => {
+                if (!snapshot.exists()) {
+                    userRef.set({ balance: 0 });
+                }
+            });
+
+            userRef.on('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    const balance = data.balance !== undefined ? data.balance : 0;
+                    userBalanceEl.innerText = "ج.م " + parseFloat(balance).toFixed(2);
+                    localStorage.setItem("user_balance", balance);
+                }
+            });
+        }
+
+        function goToPage(pageName) {
+            window.location.href = pageName + "?id=" + userID;
+        }
+    </script>
+</body>
+</html>

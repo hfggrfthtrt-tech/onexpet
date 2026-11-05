@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول - المنصة الاحترافية</title>
+    <!-- مكتبات Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        body {
+            background-color: #0d1117;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #ffffff;
+        }
+
+        .auth-container {
+            background-color: #161b22;
+            width: 100%;
+            max-width: 410px;
+            height: 100vh;
+            max-height: 850px;
+            display: flex;
+            flex-direction: column;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.06);
+            position: relative;
+        }
+
+        /* هيدر جمالي عصري بالأنيميشن والألوان */
+        .auth-header-graphics {
+            height: 35%;
+            position: relative;
+            background: linear-gradient(135deg, #1f293d 0%, #0f172a 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .glow-circle-1 {
+            position: absolute;
+            top: -40px;
+            left: -20px;
+            width: 160px;
+            height: 160px;
+            background-color: #8b5cf6;
+            filter: blur(40px);
+            opacity: 0.5;
+            border-radius: 50%;
+        }
+
+        .glow-circle-2 {
+            position: absolute;
+            bottom: -30px;
+            right: -20px;
+            width: 180px;
+            height: 180px;
+            background-color: #0ea5e9;
+            filter: blur(40px);
+            opacity: 0.5;
+            border-radius: 50%;
+        }
+
+        .auth-logo-badge {
+            position: relative;
+            z-index: 2;
+            width: 90px;
+            height: 90px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        /* صندوق النموذج */
+        .auth-form-body {
+            padding: 30px 25px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 20px;
+        }
+
+        .auth-title {
+            color: #ffffff;
+            text-align: center;
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .input-box {
+            position: relative;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 4px 15px;
+            display: flex;
+            align-items: center;
+            transition: border-color 0.2s;
+        }
+
+        .input-box:focus-within {
+            border-color: #38bdf8;
+        }
+
+        .input-box input {
+            width: 100%;
+            padding: 12px 0;
+            border: none;
+            background: none;
+            outline: none;
+            font-size: 16px;
+            color: #ffffff;
+            text-align: right;
+        }
+
+        .input-box input::placeholder {
+            color: #64748b;
+        }
+
+        .toggle-password {
+            cursor: pointer;
+            font-size: 16px;
+            color: #94a3b8;
+            user-select: none;
+            padding-left: 5px;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 16px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+            transition: transform 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn-submit:active { transform: scale(0.98); }
+
+        .create-account-link {
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .create-account-link a {
+            color: #38bdf8;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .create-account-link a:hover { text-decoration: underline; }
+
+        /* رسائل التنبيه والـ Dialog النافذة المنبثقة للنجاح */
+        .toast-msg {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background-color: #1f293d;
+            color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px 24px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 9999;
+            opacity: 0;
+            transition: 0.3s;
+            pointer-events: none;
+        }
+        .toast-msg.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+
+        .modal-box {
+            background-color: #161b22;
+            border: 1px solid rgba(255,255,255,0.1);
+            width: 90%;
+            max-width: 350px;
+            border-radius: 24px;
+            padding: 25px 20px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            transform: scale(0.8);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .modal-overlay.open .modal-box { transform: scale(1); }
+
+        .modal-icon {
+            width: 65px;
+            height: 65px;
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            margin: 0 auto 15px auto;
+        }
+
+        .modal-title { font-size: 22px; font-weight: bold; color: #ffffff; margin-bottom: 20px; }
+
+        .account-details-card {
+            background: #0d1117;
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            direction: ltr;
+        }
+
+        .account-labels { text-align: right; color: #94a3b8; font-size: 14px; font-weight: 600; line-height: 1.8; }
+        .account-vals { text-align: left; color: #38bdf8; font-size: 15px; font-weight: bold; line-height: 1.8; cursor: pointer; }
+
+        .btn-modal-action {
+            background-color: #10b981;
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 13px;
+            border-radius: 14px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="auth-container">
+        <div class="auth-header-graphics">
+            <div class="glow-circle-1"></div>
+            <div class="glow-circle-2"></div>
+            <div class="auth-logo-badge">🚀</div>
+        </div>
+
+        <div class="auth-form-body">
+            <h2 class="auth-title">تسجيل الدخول</h2>
+            
+            <form id="login-form">
+                <div class="input-box" style="margin-bottom: 18px;">
+                    <input type="text" id="username" placeholder="اسم المستخدم (ID)" required>
+                </div>
+                
+                <div class="input-box" style="margin-bottom: 20px;">
+                    <input type="password" id="password" placeholder="كلمة المرور" required>
+                    <span class="toggle-password" id="toggle-pass-icon">👁️</span>
+                </div>
+
+                <button type="submit" class="btn-submit">دخول إلى المنصة</button>
+            </form>
+
+            <div class="create-account-link">
+                <a id="btn-create-account">إنشاء حساب جديد مجاناً</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notice -->
+    <div class="toast-msg" id="toast">جاري المعالجة...</div>
+
+    <!-- Modal Success -->
+    <div class="modal-overlay" id="success-modal">
+        <div class="modal-box">
+            <div class="modal-icon">✓</div>
+            <div class="modal-title">تم إنشاء الحساب بنجاح</div>
+
+            <div class="account-details-card">
+                <div class="account-vals">
+                    <div id="gen-id" title="اضغط للنسخ">00000000</div>
+                    <div id="gen-pass" title="اضغط للنسخ">--------</div>
+                </div>
+                <div class="account-labels">
+                    <div>اسم المستخدم:</div>
+                    <div>كلمة المرور:</div>
+                </div>
+            </div>
+
+            <button class="btn-modal-action" id="btn-proceed">التالي وبدء اللعب</button>
+        </div>
+    </div>
+
+    <script>
+        // إعدادات الـ Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBv5Tl96ZNAbtGhLHwhjFYsjlvx3J9pN2g", 
+            databaseURL: "https://project-4572c85f-9506-47dd-b9c-default-rtdb.firebaseio.com/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // فحص حالة تسجيل الدخول مسبقاً لمنع الـ Loop
+        if (localStorage.getItem("isLoggedIn") === "true" && localStorage.getItem("user_id")) {
+            window.location.replace("dashboard.html?id=" + localStorage.getItem("user_id"));
+        }
+
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const togglePassIcon = document.getElementById('toggle-pass-icon');
+        const loginForm = document.getElementById('login-form');
+        const btnCreate = document.getElementById('btn-create-account');
+        const toastEl = document.getElementById('toast');
+        const successModal = document.getElementById('success-modal');
+        const genIdEl = document.getElementById('gen-id');
+        const genPassEl = document.getElementById('gen-pass');
+        const btnProceed = document.getElementById('btn-proceed');
+
+        let savedUserTemp = localStorage.getItem("savedUser") || "";
+        let savedPassTemp = localStorage.getItem("savedPass") || "";
+
+        if (savedUserTemp && savedPassTemp) {
+            usernameInput.value = savedUserTemp;
+            passwordInput.value = savedPassTemp;
+        }
+
+        // إظهار وإخفاء كلمة المرور
+        togglePassIcon.addEventListener('click', () => {
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+            } else {
+                passwordInput.type = 'password';
+            }
+        });
+
+        function showToast(msg) {
+            toastEl.innerText = msg;
+            toastEl.classList.add('show');
+            setTimeout(() => toastEl.classList.remove('show'), 2000);
+        }
+
+        function generateID() {
+            return String(Math.floor(10000000 + Math.random() * 90000000));
+        }
+
+        function generatePass() {
+            const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            let pass = "";
+            for (let i = 0; i < 8; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+            return pass;
+        }
+
+        // إنشاء حساب جديد وحفظه في الـ Firebase
+        btnCreate.addEventListener('click', () => {
+            showToast("جاري إنشاء حساب جديد...");
+            const newID = generateID();
+            const newPass = generatePass();
+
+            database.ref('User/' + newID).set({
+                userId: newID,
+                password: newPass,
+                balance: 0,
+                createdAt: Date.now()
+            }).then(() => {
+                savedUserTemp = newID;
+                savedPassTemp = newPass;
+
+                localStorage.setItem("savedUser", newID);
+                localStorage.setItem("savedPass", newPass);
+                localStorage.setItem("user_id", newID);
+
+                genIdEl.innerText = newID;
+                genPassEl.innerText = newPass;
+
+                setTimeout(() => {
+                    successModal.classList.add('open');
+                }, 800);
+            }).catch(err => {
+                showToast("خطأ في الاتصال: " + err.message);
+            });
+        });
+
+        // زر الانتقال بعد إنشاء الحساب
+        btnProceed.addEventListener('click', () => {
+            usernameInput.value = savedUserTemp;
+            passwordInput.value = savedPassTemp;
+            successModal.classList.remove('open');
+            showToast("تم ملء البيانات تلقائياً!");
+        });
+
+        // تسجيل الدخول
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const enteredUser = usernameInput.value.trim();
+            const enteredPass = passwordInput.value.trim();
+
+            if (!enteredUser || !enteredPass) {
+                showToast("يرجى إدخال البيانات كاملة!");
+                return;
+            }
+
+            database.ref('User/' + enteredUser).once('value').then((snapshot) => {
+                if (snapshot.exists()) {
+                    const userData = snapshot.val();
+                    if (enteredPass === userData.password || enteredPass === savedPassTemp) {
+                        showToast("تم تسجيل الدخول بنجاح! جاري التوجيه...");
+                        localStorage.setItem("isLoggedIn", "true");
+                        localStorage.setItem("user_id", enteredUser);
+
+                        setTimeout(() => {
+                            window.location.replace("dashboard.html?id=" + enteredUser);
+                        }, 1000);
+                    } else {
+                        showToast("كلمة المرور غير صحيحة!");
+                    }
+                } else {
+                    showToast("اسم المستخدم غير موجود!");
+                }
+            }).catch(() => {
+                if (enteredUser === savedUserTemp && enteredPass === savedPassTemp) {
+                    showToast("تم التحقق محلياً!");
+                    localStorage.setItem("isLoggedIn", "true");
+                    localStorage.setItem("user_id", enteredUser);
+                    setTimeout(() => {
+                        window.location.replace("dashboard.html?id=" + enteredUser);
+                    }, 1000);
+                } else {
+                    showToast("خطأ في التحقق من البيانات!");
+                }
+            });
+        });
+    </script>
+</body>
+</html>
